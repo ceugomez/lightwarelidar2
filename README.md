@@ -79,3 +79,6 @@ Lower angle limit of the scan in degrees (-160 to -10).
 
 Higher angle limit of the scan in degrees (10 to 160).
 
+~publishLaserScan (bool, default true)
+
+Whether to publish a `LaserScan` message on the topic `/scan`

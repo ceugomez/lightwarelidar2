@@ -5,8 +5,26 @@
 #include "lwNx.h"
 
 #include <math.h>
+#include <map>
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
+#include "sensor_msgs/point_cloud2_iterator.hpp"
+#include "sensor_msgs/msg/laser_scan.hpp"
+
+std::map<int, int> updateRateMap = {
+		{1, 50},
+		{2, 200},
+		{3, 200},
+		{4, 400},
+		{5, 500},
+		{6, 625},
+		{7, 1000},
+		{8, 1250},
+		{9, 1538},
+		{10, 2000},
+		{11, 2500},
+		{12, 5000},
+};
 
 struct lwSf45Params {
 	int32_t updateRate;
@@ -120,6 +138,78 @@ int driverScan(lwSerialPort* Serial, lwDistanceResult* DistanceResult) {
 	return 0;
 }
 
+
+std::unique_ptr<sensor_msgs::msg::LaserScan> pointCloudToLaserScan(
+		sensor_msgs::msg::PointCloud2 *CloudMessage, lwSf45Params *Params, float ScanTime, rclcpp::Logger Logger)
+{
+	// build laserscan output
+	auto scanMessage = std::make_unique<sensor_msgs::msg::LaserScan>();
+
+	scanMessage->header = CloudMessage->header;
+
+	scanMessage->angle_min = Params->lowAngleLimit;
+	scanMessage->angle_max = Params->highAngleLimit;
+	scanMessage->angle_increment = 0.00349066f;
+	scanMessage->time_increment = 1.0 / updateRateMap[Params->updateRate];
+	scanMessage->scan_time = ScanTime;
+	scanMessage->range_min = 0.2f;
+	scanMessage->range_max = 50.0f;
+
+	// determine amount of rays to create
+	uint32_t ranges_size = std::ceil(
+			(scanMessage->angle_max - scanMessage->angle_min) / scanMessage->angle_increment);
+
+	scanMessage->ranges.assign(ranges_size, std::numeric_limits<double>::infinity());
+
+	// Iterate through pointcloud
+	for (sensor_msgs::PointCloud2ConstIterator<float> iter_x(*CloudMessage, "x"),
+			 iter_y(*CloudMessage, "y"), iter_z(*CloudMessage, "z");
+			 iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z) {        
+		if (std::isnan(*iter_x) || std::isnan(*iter_y) || std::isnan(*iter_z)) {
+			RCLCPP_DEBUG(
+					Logger,
+					"rejected for nan in point(%f, %f, %f)\n",
+					*iter_x, *iter_y, *iter_z);
+			continue;
+		}
+
+		double range = hypot(*iter_x, *iter_y);
+		if (range < scanMessage->range_min)	{
+			RCLCPP_DEBUG(
+					Logger,
+					"rejected for range %f below minimum value %f. Point: (%f, %f, %f)",
+					range, scanMessage->range_min, *iter_x, *iter_y, *iter_z);
+			continue;
+		}
+
+		if (range > scanMessage->range_max)	{
+			RCLCPP_DEBUG(
+					Logger,
+					"rejected for range %f above maximum value %f. Point: (%f, %f, %f)",
+					range, scanMessage->range_max, *iter_x, *iter_y, *iter_z);
+			continue;
+		}
+
+		double angle = atan2(*iter_y, *iter_x);
+		if (angle < scanMessage->angle_min || angle > scanMessage->angle_max) {
+			RCLCPP_DEBUG(
+					Logger,
+					"rejected for angle %f not in range (%f, %f)\n",
+					angle, scanMessage->angle_min, scanMessage->angle_max);
+			continue;
+		}
+
+		// overwrite range at laserscan ray if new range is smaller
+		int index = (angle - scanMessage->angle_min) / scanMessage->angle_increment;
+		if (range < scanMessage->ranges[index]) {
+			scanMessage->ranges[index] = range;
+		}
+	}
+
+	return scanMessage;
+}
+
+
 int main(int argc, char** argv) {
 	rclcpp::init(argc, argv);
 
@@ -128,12 +218,14 @@ int main(int argc, char** argv) {
 	RCLCPP_INFO(node->get_logger(), "Starting SF45B node");
 	
 	auto pointCloudPub = node->create_publisher<sensor_msgs::msg::PointCloud2>("pointcloud", 4);
+	auto laserScanPub = node->create_publisher<sensor_msgs::msg::LaserScan>("scan", 4);
 		
 	lwSerialPort* serial = 0;
 
 	int32_t baudRate = node->declare_parameter<int32_t>("baudrate", 115200);
 	std::string portName = node->declare_parameter<std::string>("port", "/dev/ttyUSB0");
 	std::string frameId = node->declare_parameter<std::string>("frameId", "laser");
+	bool publishLaserScan = node->declare_parameter<bool>("publishLaserScan", true);
 
 	lwSf45Params params;
 	params.updateRate = node->declare_parameter<int32_t>("updateRate", 6); // 1 to 12
@@ -201,11 +293,16 @@ int main(int argc, char** argv) {
 
 			if (currentPoint == maxPointsPerMsg) {
 				memcpy(&pointCloudMsg.data[0], &distanceResults[0], maxPointsPerMsg * 12);
+				auto scanTime = pointCloudMsg.header.stamp.sec - node->now().seconds();
 
 				pointCloudMsg.header.stamp = node->now();
 				pointCloudPub->publish(pointCloudMsg);
 				
 				currentPoint = 0;
+
+				if (publishLaserScan)	{
+					laserScanPub->publish(pointCloudToLaserScan(&pointCloudMsg, &params, scanTime, node->get_logger()));
+				}
 			}
 		}
 
