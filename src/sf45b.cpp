@@ -300,7 +300,7 @@ int main(int argc, char** argv) {
 				
 				currentPoint = 0;
 
-        if (publishLaserScan)	{
+				if (publishLaserScan)	{
 					laserScanPub->publish(pointCloudToLaserScan(&pointCloudMsg, &params, scanTime, node->get_logger()));
 				}
 			}
