@@ -7,13 +7,11 @@ This node interfaces with an SF40/C and passes laser scan data to the laserscan 
 Note: The SF40/C should be configured to run at a baud rate of 921600. This is the default factory setting.
 
 ### Published topics
-
 /laserscan (sensor_msgs/LaserScan)
 
 A full 360 degrees of scan data is published to this topic at around 5Hz.
 
 ### Parameters
-
 ~port (string, default: /dev/ttyUSB0)
 
 The communications port used to interface with the SF40/C.
@@ -27,7 +25,6 @@ The transformation frame.
 This node interfaces with an SF45/B and passes point cloud data to the pointcloud topic.
 
 ### Published topics
-
 /pointcloud (sensor_msgs/PointCloud2)
 
 A configurable number of points are published to this topic. See the maxPoints parameter to control how often this topic is updated.
@@ -35,7 +32,6 @@ A configurable number of points are published to this topic. See the maxPoints p
 Note: Only a portion of the pointcloud is updated each time.
 
 ### Parameters
-
 ~port (string, default: /dev/ttyUSB0)
 
 The communications port used to interface with the SF45/B.
@@ -57,7 +53,7 @@ The number of distance readings taken before a result is published to the /point
 The number of distance readings taken per second.
 
 | Value | Readings per second |
-| ----- | ------------------- |
+|-------|---------------------|
 | 1     | 50                  |
 | 2     | 100                 |
 | 3     | 200                 |
