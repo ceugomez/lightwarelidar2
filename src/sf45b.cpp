@@ -300,8 +300,6 @@ int main(int argc, char** argv) {
 
 				pointCloudMsg.header.stamp = node->now();
 				pointCloudPub->publish(pointCloudMsg);
-				
-				currentPoint = 0;
 
 				if (publishLaserScan)
 				{
@@ -310,6 +308,8 @@ int main(int argc, char** argv) {
 
 					laserScanPub->publish(laserScanMsg);
 				}
+
+				currentPoint = 0;
 			}
 		}
 
