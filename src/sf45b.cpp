@@ -35,6 +35,10 @@ struct lwSf45Params {
 
 std::shared_ptr<rclcpp::Node> node;
 
+float degreesToRadians(float degrees) {
+	return 2 * M_PI * (degrees / 360);
+}
+
 void validateParams(lwSf45Params* Params) {
 	if (Params->updateRate < 1) Params->updateRate = 1;
 	else if (Params->updateRate > 12) Params->updateRate = 12;
@@ -116,7 +120,14 @@ struct lwDistanceResult {
 	float z;
 };
 
-int driverScan(lwSerialPort* Serial, lwDistanceResult* DistanceResult) {
+struct rawDistanceResult
+{
+	float distance;
+	float angle;
+};
+
+int driverScan(lwSerialPort *Serial, lwDistanceResult *DistanceResult, rawDistanceResult *RawDistanceResult)
+{
 	// The incoming point data packet is Command 44: Distance data in cm.
 	lwResponsePacket response;
 
@@ -132,78 +143,66 @@ int driverScan(lwSerialPort* Serial, lwDistanceResult* DistanceResult) {
 		DistanceResult->y = distance * sin(faceAngle);
 		DistanceResult->z = 0;
 
+		RawDistanceResult->distance = distance;
+		RawDistanceResult->angle = degreesToRadians(angle);
+
 		return 1;
 	}
 
 	return 0;
 }
 
+bool compareRawDistances(const rawDistanceResult & l, const rawDistanceResult & r) {
+	return l.angle < r.angle;
+}
 
-std::unique_ptr<sensor_msgs::msg::LaserScan> pointCloudToLaserScan(
-		sensor_msgs::msg::PointCloud2 *CloudMessage, lwSf45Params *Params, float ScanTime, rclcpp::Logger Logger)
+sensor_msgs::msg::LaserScan getLaserScanMessage(
+		int PointCount, std::vector<rawDistanceResult> &rawDistances, lwSf45Params *Params, float ScanTime, rclcpp::Logger Logger)
 {
+	// maxPointsPerMsg cuts our reading in the middle so the data is not sorted 
+	std::sort(rawDistances.begin(), rawDistances.end(), compareRawDistances);
 	// build laserscan output
-	auto scanMessage = std::make_unique<sensor_msgs::msg::LaserScan>();
+	auto scanMessage = sensor_msgs::msg::LaserScan();
+ 
+	float configuredMinAngle = degreesToRadians(Params->lowAngleLimit);
+	float configuredMaxAngle = degreesToRadians(Params->highAngleLimit);
 
-	scanMessage->header = CloudMessage->header;
+	// We use the min and max angles from the data, as the configured min and max are not valid as the maxPointsPerMsg
+	// can cut the reading in the middle and then the configured angle max is not the real angle max
+	scanMessage.angle_min = std::max(configuredMinAngle, rawDistances[0].angle);
+	scanMessage.angle_max = std::min(configuredMaxAngle, rawDistances.back().angle);
+	scanMessage.angle_increment = std::abs(scanMessage.angle_min - scanMessage.angle_max) / (PointCount - 1);
+	scanMessage.time_increment = 0.0;
+	scanMessage.scan_time = ScanTime;
+	scanMessage.range_min = 0.2f;
+	scanMessage.range_max = 50.0f;
 
-	scanMessage->angle_min = Params->lowAngleLimit;
-	scanMessage->angle_max = Params->highAngleLimit;
-	scanMessage->angle_increment = 0.00349066f;
-	scanMessage->time_increment = 1.0 / updateRateMap[Params->updateRate];
-	scanMessage->scan_time = ScanTime;
-	scanMessage->range_min = 0.2f;
-	scanMessage->range_max = 50.0f;
+	scanMessage.ranges.assign(PointCount, std::numeric_limits<double>::infinity());
+	
+	// Iterate through distances and validate them
+	for (int i = 0; i < PointCount; i++)
+	{
+		rawDistanceResult &current = rawDistances[i];
 
-	// determine amount of rays to create
-	uint32_t ranges_size = std::ceil(
-			(scanMessage->angle_max - scanMessage->angle_min) / scanMessage->angle_increment);
-
-	scanMessage->ranges.assign(ranges_size, std::numeric_limits<double>::infinity());
-
-	// Iterate through pointcloud
-	for (sensor_msgs::PointCloud2ConstIterator<float> iter_x(*CloudMessage, "x"),
-			 iter_y(*CloudMessage, "y"), iter_z(*CloudMessage, "z");
-			 iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z) {        
-		if (std::isnan(*iter_x) || std::isnan(*iter_y) || std::isnan(*iter_z)) {
+		if (current.distance > scanMessage.range_max)
+		{
 			RCLCPP_DEBUG(
 					Logger,
-					"rejected for nan in point(%f, %f, %f)\n",
-					*iter_x, *iter_y, *iter_z);
+					"rejected for range %f above maximum value %f. Point: (%d)",
+					current.distance, scanMessage.range_max, i);
 			continue;
 		}
 
-		double range = hypot(*iter_x, *iter_y);
-		if (range < scanMessage->range_min)	{
-			RCLCPP_DEBUG(
-					Logger,
-					"rejected for range %f below minimum value %f. Point: (%f, %f, %f)",
-					range, scanMessage->range_min, *iter_x, *iter_y, *iter_z);
-			continue;
-		}
-
-		if (range > scanMessage->range_max)	{
-			RCLCPP_DEBUG(
-					Logger,
-					"rejected for range %f above maximum value %f. Point: (%f, %f, %f)",
-					range, scanMessage->range_max, *iter_x, *iter_y, *iter_z);
-			continue;
-		}
-
-		double angle = atan2(*iter_y, *iter_x);
-		if (angle < scanMessage->angle_min || angle > scanMessage->angle_max) {
+		if (current.angle < configuredMinAngle || current.angle > configuredMaxAngle)
+		{
 			RCLCPP_DEBUG(
 					Logger,
 					"rejected for angle %f not in range (%f, %f)\n",
-					angle, scanMessage->angle_min, scanMessage->angle_max);
+					current.angle, configuredMinAngle, configuredMaxAngle);
 			continue;
-		}
-
-		// overwrite range at laserscan ray if new range is smaller
-		int index = (angle - scanMessage->angle_min) / scanMessage->angle_increment;
-		if (range < scanMessage->ranges[index]) {
-			scanMessage->ranges[index] = range;
-		}
+		}		
+		
+		scanMessage.ranges[i] = current.distance;		
 	}
 
 	return scanMessage;
@@ -277,32 +276,40 @@ int main(int argc, char** argv) {
 
 	int currentPoint = 0;
 	std::vector<lwDistanceResult> distanceResults(maxPointsPerMsg);
+	std::vector<rawDistanceResult> rawDistances(maxPointsPerMsg);
 
 	while (rclcpp::ok()) {
 
 		while (true) {
 			lwDistanceResult distanceResult;
-			int status = driverScan(serial, &distanceResult);
+			rawDistanceResult rawDistanceResult;
+
+			int status = driverScan(serial, &distanceResult, &rawDistanceResult);
 
 			if (status == 0) {
 				break;
 			} else {
 				distanceResults[currentPoint] = distanceResult;
+				rawDistances[currentPoint] = rawDistanceResult;
 				++currentPoint;
 			}
 
 			if (currentPoint == maxPointsPerMsg) {
 				memcpy(&pointCloudMsg.data[0], &distanceResults[0], maxPointsPerMsg * 12);
-				auto scanTime = pointCloudMsg.header.stamp.sec - node->now().seconds();
+				auto scanTime = node->now().seconds() - pointCloudMsg.header.stamp.sec;
 
 				pointCloudMsg.header.stamp = node->now();
 				pointCloudPub->publish(pointCloudMsg);
-				
-				currentPoint = 0;
 
-				if (publishLaserScan)	{
-					laserScanPub->publish(pointCloudToLaserScan(&pointCloudMsg, &params, scanTime, node->get_logger()));
+				if (publishLaserScan)
+				{
+					auto laserScanMsg = getLaserScanMessage(currentPoint, rawDistances, &params, scanTime, node->get_logger());
+					laserScanMsg.header = pointCloudMsg.header;
+
+					laserScanPub->publish(laserScanMsg);
 				}
+
+				currentPoint = 0;
 			}
 		}
 
