@@ -118,6 +118,8 @@ struct lwDistanceResult {
 	float x;
 	float y;
 	float z;
+	float time;
+	uint8_t ring;
 };
 
 struct rawDistanceResult
@@ -142,6 +144,8 @@ int driverScan(lwSerialPort *Serial, lwDistanceResult *DistanceResult, rawDistan
 		DistanceResult->x = distance * -cos(faceAngle);
 		DistanceResult->y = distance * sin(faceAngle);
 		DistanceResult->z = 0;
+
+		DistanceResult->ring = 0;
 
 		RawDistanceResult->distance = distance;
 		RawDistanceResult->angle = degreesToRadians(angle);
@@ -216,24 +220,24 @@ int main(int argc, char** argv) {
 
 	RCLCPP_INFO(node->get_logger(), "Starting SF45B node");
 	
-	auto pointCloudPub = node->create_publisher<sensor_msgs::msg::PointCloud2>("pointcloud", 4);
+	auto pointCloudPub = node->create_publisher<sensor_msgs::msg::PointCloud2>("points", 4);
 	auto laserScanPub = node->create_publisher<sensor_msgs::msg::LaserScan>("scan", 4);
 		
 	lwSerialPort* serial = 0;
 
 	int32_t baudRate = node->declare_parameter<int32_t>("baudrate", 115200);
-	std::string portName = node->declare_parameter<std::string>("port", "/dev/ttyUSB0");
-	std::string frameId = node->declare_parameter<std::string>("frameId", "laser");
+	std::string portName = node->declare_parameter<std::string>("port", "/dev/ttyACM0");
+	std::string frameId = node->declare_parameter<std::string>("frameId", "laser_sensor_frame");
 	bool publishLaserScan = node->declare_parameter<bool>("publishLaserScan", true);
 
 	lwSf45Params params;
-	params.updateRate = node->declare_parameter<int32_t>("updateRate", 6); // 1 to 12
+	params.updateRate = node->declare_parameter<int32_t>("updateRate", 12); // 1 to 12
 	params.cycleDelay = node->declare_parameter<int32_t>("cycleDelay", 5); // 5 to 2000
-	params.lowAngleLimit = node->declare_parameter<int32_t>("lowAngleLimit", -45.0f); // -160 to -10
-	params.highAngleLimit = node->declare_parameter<int32_t>("highAngleLimit", 45.0f); // 10 to 160
+	params.lowAngleLimit = node->declare_parameter<int32_t>("lowAngleLimit", -160.0f); // -160 to -10
+	params.highAngleLimit = node->declare_parameter<int32_t>("highAngleLimit", 160.0f); // 10 to 160
 	validateParams(&params);
 	
-	int32_t maxPointsPerMsg = node->declare_parameter<int32_t>("maxPoints", 100); // 1 to ...
+	int32_t maxPointsPerMsg = node->declare_parameter<int32_t>("maxPoints", 5000); // 1 to ...
 	if (maxPointsPerMsg < 1) maxPointsPerMsg = 1;
 	
 	if (driverStart(&serial, portName.c_str(), baudRate) != 0) {
@@ -246,12 +250,16 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
+	// This value can be compiler/hardware specific. It's vital to check that this matches
+	// the number of bytes for an lwDistanceResult struct as padding (or lack of) can alter the memory size.
+	int32_t sizeOflwDistanceResultStruct = 20;
+
 	sensor_msgs::msg::PointCloud2 pointCloudMsg;
 	pointCloudMsg.header.frame_id = frameId;
 	pointCloudMsg.height = 1;
 	pointCloudMsg.width = maxPointsPerMsg;
 	
-	pointCloudMsg.fields.resize(3);
+	pointCloudMsg.fields.resize(5);
 	pointCloudMsg.fields[0].name = "x";
 	pointCloudMsg.fields[0].offset = 0;	
 	pointCloudMsg.fields[0].datatype = 7;
@@ -267,35 +275,62 @@ int main(int argc, char** argv) {
 	pointCloudMsg.fields[2].datatype = 7;
 	pointCloudMsg.fields[2].count = 1;
 
+	// Time and ring are added to make the PointCloud2 message compatible with the velodyne
+	// laser format used in the LIO-SAM package.
+    pointCloudMsg.fields[3].name = "time";
+	pointCloudMsg.fields[3].offset = 12;
+	pointCloudMsg.fields[3].datatype = 7;
+	pointCloudMsg.fields[3].count = 1;
+
+	pointCloudMsg.fields[4].name = "ring";
+	pointCloudMsg.fields[4].offset = 16;
+	pointCloudMsg.fields[4].datatype = 2; // 2: uint8
+	pointCloudMsg.fields[4].count = 1;
+
 	pointCloudMsg.is_bigendian = false;
-	pointCloudMsg.point_step = 12;
-	pointCloudMsg.row_step = 12 * maxPointsPerMsg;
+	pointCloudMsg.point_step = sizeOflwDistanceResultStruct;
+	pointCloudMsg.row_step = sizeOflwDistanceResultStruct * maxPointsPerMsg;
 	pointCloudMsg.is_dense = true;
 
-	pointCloudMsg.data = std::vector<uint8_t>(maxPointsPerMsg * 12);
+	pointCloudMsg.data = std::vector<uint8_t>(maxPointsPerMsg * sizeOflwDistanceResultStruct);
 
 	int currentPoint = 0;
+
+	// Used to make the PointCloud2 message compatible with the velodyne lidar format expected by LIO-SAM
+	float relativeScanTime = 0.0f;
+
 	std::vector<lwDistanceResult> distanceResults(maxPointsPerMsg);
 	std::vector<rawDistanceResult> rawDistances(maxPointsPerMsg);
 
 	while (rclcpp::ok()) {
 
+		// This debug statement will give the sizeof the lwDistanceResult struct when the node is run
+		// Ensure that the size outputed matches the size variable used for memory allocation and memcpy
+		RCLCPP_INFO(node->get_logger(), "Starting SF45B node. Size of lwDistanceResult: %zu bytes", sizeof(lwDistanceResult));
+
 		while (true) {
+
 			lwDistanceResult distanceResult;
 			rawDistanceResult rawDistanceResult;
 
 			int status = driverScan(serial, &distanceResult, &rawDistanceResult);
+			distanceResult.time = relativeScanTime;
 
 			if (status == 0) {
 				break;
 			} else {
 				distanceResults[currentPoint] = distanceResult;
 				rawDistances[currentPoint] = rawDistanceResult;
+
+				// LIO-SAM requires a relative scan time that ranges between 0 and 0.2 seconds for a 5Hz scan
+				// With 5000 pps and (maxPointPerMsg = 5000) we have 0.2 / 5000 => 0.00004 increments
+				relativeScanTime += 0.00004;
+
 				++currentPoint;
 			}
 
 			if (currentPoint == maxPointsPerMsg) {
-				memcpy(&pointCloudMsg.data[0], &distanceResults[0], maxPointsPerMsg * 12);
+				memcpy(&pointCloudMsg.data[0], &distanceResults[0], maxPointsPerMsg * sizeOflwDistanceResultStruct);
 				auto scanTime = node->now().seconds() - pointCloudMsg.header.stamp.sec;
 
 				pointCloudMsg.header.stamp = node->now();
@@ -310,6 +345,7 @@ int main(int argc, char** argv) {
 				}
 
 				currentPoint = 0;
+				relativeScanTime = 0.0;
 			}
 		}
 
