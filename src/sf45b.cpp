@@ -277,7 +277,7 @@ int main(int argc, char** argv) {
 
 	// Time and ring are added to make the PointCloud2 message compatible with the velodyne
 	// laser format used in the LIO-SAM package.
-    pointCloudMsg.fields[3].name = "time";
+	pointCloudMsg.fields[3].name = "time";
 	pointCloudMsg.fields[3].offset = 12;
 	pointCloudMsg.fields[3].datatype = 7;
 	pointCloudMsg.fields[3].count = 1;
