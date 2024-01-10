@@ -231,13 +231,13 @@ int main(int argc, char** argv) {
 	bool publishLaserScan = node->declare_parameter<bool>("publishLaserScan", true);
 
 	lwSf45Params params;
-	params.updateRate = node->declare_parameter<int32_t>("updateRate", 12); // 1 to 12
+	params.updateRate = node->declare_parameter<int32_t>("updateRate", 7); // 1 to 12
 	params.cycleDelay = node->declare_parameter<int32_t>("cycleDelay", 5); // 5 to 2000
 	params.lowAngleLimit = node->declare_parameter<int32_t>("lowAngleLimit", -160.0f); // -160 to -10
 	params.highAngleLimit = node->declare_parameter<int32_t>("highAngleLimit", 160.0f); // 10 to 160
 	validateParams(&params);
 	
-	int32_t maxPointsPerMsg = node->declare_parameter<int32_t>("maxPoints", 5000); // 1 to ...
+	int32_t maxPointsPerMsg = node->declare_parameter<int32_t>("maxPoints", 1000); // 1 to ...
 	if (maxPointsPerMsg < 1) maxPointsPerMsg = 1;
 	
 	if (driverStart(&serial, portName.c_str(), baudRate) != 0) {
@@ -324,7 +324,7 @@ int main(int argc, char** argv) {
 
 				// LIO-SAM requires a relative scan time that ranges between 0 and 0.2 seconds for a 5Hz scan
 				// With 5000 pps and (maxPointPerMsg = 5000) we have 0.2 / 5000 => 0.00004 increments
-				relativeScanTime += 0.00004;
+				relativeScanTime += 0.0002;
 
 				++currentPoint;
 			}
