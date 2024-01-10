@@ -18,8 +18,8 @@ include_directories(
   include/lightwarelidar2/linux
 )
 
-add_executable(sf40c src/sf40c.cpp)
-ament_target_dependencies(sf40c rclcpp sensor_msgs)
+# add_executable(sf40c src/sf40c.cpp)
+# ament_target_dependencies(sf40c rclcpp sensor_msgs)
 
 add_executable(sf45b src/sf45b.cpp)
 ament_target_dependencies(sf45b rclcpp sensor_msgs)
@@ -29,11 +29,11 @@ ament_target_dependencies(sf45b rclcpp sensor_msgs)
 #   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/lightwarelidar2/linux>
 #   $<INSTALL_INTERFACE:include>)
 
-target_link_libraries(sf40c
-  lwNx
-  platformLinux
-  serialPortLinux
-)
+# target_link_libraries(sf40c
+#   lwNx
+#   platformLinux
+#   serialPortLinux
+# )
 
 target_link_libraries(sf45b
   lwNx
@@ -41,8 +41,8 @@ target_link_libraries(sf45b
   serialPortLinux
 )
 
+# Removed SF40
 install(TARGETS
-  sf40c
   sf45b
   DESTINATION lib/${PROJECT_NAME})
   
