@@ -117,13 +117,15 @@ int driverScanStart(lwSerialPort* Serial, lwSf45Params* Params) {
 	return 0;
 }
 
-struct __attribute__((packed)) lwDistanceResult {
+//struct __attribute__((packed)) lwDistanceResult - didn't work when packed this way
+struct lwDistanceResult {
 	float x;
 	float y;
 	float z;
 	float intensity;
 	float time;
 	uint16_t ring;
+	uint16_t dummy_data;
 };
 
 struct rawDistanceResult
@@ -150,7 +152,6 @@ int driverScan(lwSerialPort *Serial, lwDistanceResult *DistanceResult, rawDistan
 		DistanceResult->z = 0;
 
 		DistanceResult->intensity = 1.0f;
-		DistanceResult->ring = 0;
 
 		RawDistanceResult->distance = distance;
 		RawDistanceResult->angle = degreesToRadians(angle);
@@ -261,14 +262,14 @@ int main(int argc, char** argv) {
 
 	// This value can be compiler/hardware specific. It's vital to check that this matches
 	// the number of bytes for an lwDistanceResult struct as padding (or lack of) can alter the memory size.
-	int32_t sizeOflwDistanceResultStruct = 22;
+	int32_t sizeOflwDistanceResultStruct = 24;
 
 	sensor_msgs::msg::PointCloud2 pointCloudMsg;
 	pointCloudMsg.header.frame_id = frameId;
 	pointCloudMsg.height = 1;
 	pointCloudMsg.width = maxPointsPerMsg;
 	
-	pointCloudMsg.fields.resize(6);
+	pointCloudMsg.fields.resize(7);
 	pointCloudMsg.fields[0].name = "x";
 	pointCloudMsg.fields[0].offset = 0;	
 	pointCloudMsg.fields[0].datatype = 7;
@@ -297,10 +298,14 @@ int main(int argc, char** argv) {
 	pointCloudMsg.fields[4].count = 1;
 
 	pointCloudMsg.fields[5].name = "ring";
-	pointCloudMsg.fields[5].offset = 18;
+	pointCloudMsg.fields[5].offset = 20;
 	pointCloudMsg.fields[5].datatype = 4; // 4: uint16
 	pointCloudMsg.fields[5].count = 1;
 
+	pointCloudMsg.fields[6].name = "dummy_data";
+	pointCloudMsg.fields[6].offset = 22;
+	pointCloudMsg.fields[6].datatype = 4; // 4: uint16
+	pointCloudMsg.fields[6].count = 1;
 
 	pointCloudMsg.is_bigendian = false;
 	pointCloudMsg.point_step = sizeOflwDistanceResultStruct;
@@ -327,8 +332,8 @@ int main(int argc, char** argv) {
 			int status = driverScan(serial, &distanceResult, &rawDistanceResult);
 
 			distanceResult.time = relativeScanTime;
-			//std::cout << "relative scan time " << relativeScanTime << std::endl;
-			//std::cout << "distanceResult.time set to: " << distanceResult.time << std::endl;
+			distanceResult.ring = (uint16_t) 0;
+			distanceResult.dummy_data = (uint16_t) 1;
 
 			if (status == 0) {
 				break;
