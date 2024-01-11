@@ -118,9 +118,9 @@ struct lwDistanceResult {
 	float x;
 	float y;
 	float z;
-	float time;
 	float intensity;
 	uint16_t ring;
+	float time;
 };
 
 struct rawDistanceResult
@@ -146,6 +146,7 @@ int driverScan(lwSerialPort *Serial, lwDistanceResult *DistanceResult, rawDistan
 		DistanceResult->y = distance * sin(faceAngle);
 		DistanceResult->z = 0;
 
+		DistanceResult->intensity = 1.0f;
 		DistanceResult->ring = 0;
 
 		RawDistanceResult->distance = distance;
@@ -321,12 +322,12 @@ int main(int argc, char** argv) {
 			rawDistanceResult rawDistanceResult;
 
 			int status = driverScan(serial, &distanceResult, &rawDistanceResult);
-			distanceResult.time = relativeScanTime;
-			distanceResult.intensity = 1.0f;
 
 			if (status == 0) {
 				break;
 			} else {
+				distanceResult.time = relativeScanTime;
+
 				distanceResults[currentPoint] = distanceResult;
 				rawDistances[currentPoint] = rawDistanceResult;
 
