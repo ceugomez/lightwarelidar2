@@ -122,8 +122,8 @@ struct lwDistanceResult {
 	float y;
 	float z;
 	float intensity;
-	uint16_t ring;
 	float time;
+	uint16_t ring;
 };
 
 struct rawDistanceResult
@@ -249,8 +249,6 @@ int main(int argc, char** argv) {
 	// Ensure that the size outputed matches the size variable used for memory allocation and memcpy
 	RCLCPP_INFO(node->get_logger(), "Starting SF45B node. Size of lwDistanceResult: %zu bytes", sizeof(lwDistanceResult));
 	
-    std::cout << "Size of uint16_t: " << sizeof(uint16_t) << " bytes" << std::endl;
-
 	if (driverStart(&serial, portName.c_str(), baudRate) != 0) {
 		RCLCPP_ERROR(node->get_logger(), "Failed to start driver");
 		return 1;
@@ -293,15 +291,16 @@ int main(int argc, char** argv) {
 	pointCloudMsg.fields[3].datatype = 7;
 	pointCloudMsg.fields[3].count = 1;
 
-	pointCloudMsg.fields[4].name = "ring";
+	pointCloudMsg.fields[4].name = "time";
 	pointCloudMsg.fields[4].offset = 16;
-	pointCloudMsg.fields[4].datatype = 4; // 4: uint16
+	pointCloudMsg.fields[4].datatype = 7;
 	pointCloudMsg.fields[4].count = 1;
 
-	pointCloudMsg.fields[5].name = "time";
+	pointCloudMsg.fields[5].name = "ring";
 	pointCloudMsg.fields[5].offset = 18;
-	pointCloudMsg.fields[5].datatype = 7;
+	pointCloudMsg.fields[5].datatype = 4; // 4: uint16
 	pointCloudMsg.fields[5].count = 1;
+
 
 	pointCloudMsg.is_bigendian = false;
 	pointCloudMsg.point_step = sizeOflwDistanceResultStruct;
@@ -327,10 +326,13 @@ int main(int argc, char** argv) {
 
 			int status = driverScan(serial, &distanceResult, &rawDistanceResult);
 
+			distanceResult.time = relativeScanTime;
+			std::cout << "relative scan time " << relativeScanTime << std::endl;
+			std::cout << "distanceResult.time set to: " << distanceResult.time << std::endl;
+
 			if (status == 0) {
 				break;
 			} else {
-				distanceResult.time = relativeScanTime;
 
 				distanceResults[currentPoint] = distanceResult;
 				rawDistances[currentPoint] = rawDistanceResult;
