@@ -39,12 +39,13 @@ class PointcloudSubscriber : public rclcpp::Node
       sensor_msgs::PointCloud2ConstIterator<float> iter_x(*msg, "x");
       sensor_msgs::PointCloud2ConstIterator<float> iter_y(*msg, "y");
       sensor_msgs::PointCloud2ConstIterator<float> iter_z(*msg, "z");
+      sensor_msgs::PointCloud2ConstIterator<float> iter_int(*msg, "intensity");
+      sensor_msgs::PointCloud2ConstIterator<uint16_t> iter_ring(*msg, "ring");
       sensor_msgs::PointCloud2ConstIterator<float> iter_time(*msg, "time");
-      sensor_msgs::PointCloud2ConstIterator<uint8_t> iter_ring(*msg, "ring");
 
       // Print the first point's x, y, z, time values and ring number
-      RCLCPP_INFO(this->get_logger(), "First point: x=%f, y=%f, z=%f, time=%f, ring=%u", 
-                  *iter_x, *iter_y, *iter_z, *iter_time, *iter_ring);
+      RCLCPP_INFO(this->get_logger(), "First point: x=%f, y=%f, z=%f, intensity=%f, ring=%u, time=%f", 
+                  *iter_x, *iter_y, *iter_z, *iter_int, *iter_ring, *iter_time);
 
       // Increment iterators to point to the second point
       ++iter_x;
@@ -54,8 +55,8 @@ class PointcloudSubscriber : public rclcpp::Node
       ++iter_ring;
 
       // Print the second point's x, y, z, time values and ring number
-      RCLCPP_INFO(this->get_logger(), "Second point: x=%f, y=%f, z=%f, time=%f, ring=%u", 
-                  *iter_x, *iter_y, *iter_z, *iter_time, *iter_ring);
+      RCLCPP_INFO(this->get_logger(), "Second point: x=%f, y=%f, z=%f, intensity=%f, ring=%u, time=%f", 
+                  *iter_x, *iter_y, *iter_z, *iter_int, *iter_ring, *iter_time);
 
       // Increment iterators to point to the third point
       ++iter_x;
@@ -65,23 +66,23 @@ class PointcloudSubscriber : public rclcpp::Node
       ++iter_ring;
 
       // Print the third point's x, y, z, time values and ring number
-      RCLCPP_INFO(this->get_logger(), "Third point: x=%f, y=%f, z=%f, time=%f, ring=%u", 
-                  *iter_x, *iter_y, *iter_z, *iter_time, *iter_ring);
+      RCLCPP_INFO(this->get_logger(), "Third point: x=%f, y=%f, z=%f, intensity=%f, ring=%u, time=%f", 
+                  *iter_x, *iter_y, *iter_z, *iter_int, *iter_ring, *iter_time);
 
       // The compiler barfed when I tried to use the decrement operator so hacking this together
       // Iterate to the last point
       int indexOfLastPoint = 999;  // (999 for 1000 points)
       
       // Move iterators to the last point accounting for the prior increments
-      iter_x += (indexOfLastPoint - 3);
-      iter_y += (indexOfLastPoint - 3);
-      iter_z += (indexOfLastPoint - 3);
-      iter_time += (indexOfLastPoint - 3);
-      iter_ring += (indexOfLastPoint - 3);
+      iter_x += (indexOfLastPoint - 2);
+      iter_y += (indexOfLastPoint - 2);
+      iter_z += (indexOfLastPoint - 2);
+      iter_time += (indexOfLastPoint - 2);
+      iter_ring += (indexOfLastPoint - 2);
 
       // Print the last point
-      RCLCPP_INFO(this->get_logger(), "Last point: x=%f, y=%f, z=%f, time=%f, ring=%u", 
-                  *iter_x, *iter_y, *iter_z, *iter_time, *iter_ring);
+      RCLCPP_INFO(this->get_logger(), "Last point: x=%f, y=%f, z=%f, intensity=%f, ring=%u, time=%f", 
+                  *iter_x, *iter_y, *iter_z, *iter_int, *iter_ring, *iter_time);
   }
 
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subscription_;
