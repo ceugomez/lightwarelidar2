@@ -24,6 +24,9 @@ include_directories(
 add_executable(sf45b src/sf45b.cpp)
 ament_target_dependencies(sf45b rclcpp sensor_msgs)
 
+add_executable(pointCloudSubscriber src/pointCloudSubscriber.cpp)
+ament_target_dependencies(pointCloudSubscriber rclcpp sensor_msgs)
+
 # target_include_directories(sf40c PRIVATE
 #   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/lightwarelidar2>
 #   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/lightwarelidar2/linux>
@@ -44,6 +47,7 @@ target_link_libraries(sf45b
 # Removed SF40
 install(TARGETS
   sf45b
+  pointCloudSubscriber
   DESTINATION lib/${PROJECT_NAME})
   
 ament_package()
