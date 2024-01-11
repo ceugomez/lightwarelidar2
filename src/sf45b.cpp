@@ -120,7 +120,7 @@ struct lwDistanceResult {
 	float z;
 	float time;
 	float intensity;
-	uint8_t ring;
+	uint16_t ring;
 };
 
 struct rawDistanceResult
@@ -229,17 +229,22 @@ int main(int argc, char** argv) {
 	int32_t baudRate = node->declare_parameter<int32_t>("baudrate", 115200);
 	std::string portName = node->declare_parameter<std::string>("port", "/dev/ttyACM0");
 	std::string frameId = node->declare_parameter<std::string>("frameId", "laser_sensor_frame");
-	bool publishLaserScan = node->declare_parameter<bool>("publishLaserScan", true);
+	bool publishLaserScan = node->declare_parameter<bool>("publishLaserScan", false);
 
 	lwSf45Params params;
 	params.updateRate = node->declare_parameter<int32_t>("updateRate", 7); // 1 to 12
-	params.cycleDelay = node->declare_parameter<int32_t>("cycleDelay", 5); // 5 to 2000
+	params.cycleDelay = node->declare_parameter<int32_t>("cycleDelay", 10); // 5 to 2000
 	params.lowAngleLimit = node->declare_parameter<int32_t>("lowAngleLimit", -160.0f); // -160 to -10
 	params.highAngleLimit = node->declare_parameter<int32_t>("highAngleLimit", 160.0f); // 10 to 160
 	validateParams(&params);
 	
-	int32_t maxPointsPerMsg = node->declare_parameter<int32_t>("maxPoints", 1000); // 1 to ...
+	int32_t maxPointsPerMsg = node->declare_parameter<int32_t>("maxPoints", 1500); // 1 to ...
 	if (maxPointsPerMsg < 1) maxPointsPerMsg = 1;
+
+	// This debug statement will give the sizeof the lwDistanceResult struct when the node is run
+	// Ensure that the size outputed matches the size variable used for memory allocation and memcpy
+	RCLCPP_INFO(node->get_logger(), "Starting SF45B node. Size of lwDistanceResult: %zu bytes", sizeof(lwDistanceResult));
+
 	
 	if (driverStart(&serial, portName.c_str(), baudRate) != 0) {
 		RCLCPP_ERROR(node->get_logger(), "Failed to start driver");
@@ -289,8 +294,8 @@ int main(int argc, char** argv) {
 	pointCloudMsg.fields[4].count = 1;
 
 	pointCloudMsg.fields[5].name = "ring";
-	pointCloudMsg.fields[5].offset = 17;
-	pointCloudMsg.fields[5].datatype = 2; // 2: uint8
+	pointCloudMsg.fields[5].offset = 18;
+	pointCloudMsg.fields[5].datatype = 4; // 4: uint16
 	pointCloudMsg.fields[5].count = 1;
 
 	pointCloudMsg.is_bigendian = false;
@@ -309,10 +314,6 @@ int main(int argc, char** argv) {
 	std::vector<rawDistanceResult> rawDistances(maxPointsPerMsg);
 
 	while (rclcpp::ok()) {
-
-		// This debug statement will give the sizeof the lwDistanceResult struct when the node is run
-		// Ensure that the size outputed matches the size variable used for memory allocation and memcpy
-		RCLCPP_INFO(node->get_logger(), "Starting SF45B node. Size of lwDistanceResult: %zu bytes", sizeof(lwDistanceResult));
 
 		while (true) {
 
