@@ -119,6 +119,7 @@ struct lwDistanceResult {
 	float y;
 	float z;
 	float time;
+	float intensity;
 	uint8_t ring;
 };
 
@@ -252,14 +253,14 @@ int main(int argc, char** argv) {
 
 	// This value can be compiler/hardware specific. It's vital to check that this matches
 	// the number of bytes for an lwDistanceResult struct as padding (or lack of) can alter the memory size.
-	int32_t sizeOflwDistanceResultStruct = 20;
+	int32_t sizeOflwDistanceResultStruct = 24;
 
 	sensor_msgs::msg::PointCloud2 pointCloudMsg;
 	pointCloudMsg.header.frame_id = frameId;
 	pointCloudMsg.height = 1;
 	pointCloudMsg.width = maxPointsPerMsg;
 	
-	pointCloudMsg.fields.resize(5);
+	pointCloudMsg.fields.resize(6);
 	pointCloudMsg.fields[0].name = "x";
 	pointCloudMsg.fields[0].offset = 0;	
 	pointCloudMsg.fields[0].datatype = 7;
@@ -275,17 +276,22 @@ int main(int argc, char** argv) {
 	pointCloudMsg.fields[2].datatype = 7;
 	pointCloudMsg.fields[2].count = 1;
 
-	// Time and ring are added to make the PointCloud2 message compatible with the velodyne
+	// Time, intensity, and ring are added to make the PointCloud2 message compatible with the velodyne
 	// laser format used in the LIO-SAM package.
 	pointCloudMsg.fields[3].name = "time";
 	pointCloudMsg.fields[3].offset = 12;
 	pointCloudMsg.fields[3].datatype = 7;
 	pointCloudMsg.fields[3].count = 1;
 
-	pointCloudMsg.fields[4].name = "ring";
+	pointCloudMsg.fields[4].name = "intensity";
 	pointCloudMsg.fields[4].offset = 16;
-	pointCloudMsg.fields[4].datatype = 2; // 2: uint8
+	pointCloudMsg.fields[4].datatype = 7;
 	pointCloudMsg.fields[4].count = 1;
+
+	pointCloudMsg.fields[5].name = "ring";
+	pointCloudMsg.fields[5].offset = 17;
+	pointCloudMsg.fields[5].datatype = 2; // 2: uint8
+	pointCloudMsg.fields[5].count = 1;
 
 	pointCloudMsg.is_bigendian = false;
 	pointCloudMsg.point_step = sizeOflwDistanceResultStruct;
@@ -315,6 +321,7 @@ int main(int argc, char** argv) {
 
 			int status = driverScan(serial, &distanceResult, &rawDistanceResult);
 			distanceResult.time = relativeScanTime;
+			distanceResult.intensity = 1.0f;
 
 			if (status == 0) {
 				break;
