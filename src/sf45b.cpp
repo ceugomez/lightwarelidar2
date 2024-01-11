@@ -4,6 +4,9 @@
 #include "common.h"
 #include "lwNx.h"
 
+#include <iostream>
+#include <cstdint>
+
 #include <math.h>
 #include <map>
 #include "rclcpp/rclcpp.hpp"
@@ -245,8 +248,9 @@ int main(int argc, char** argv) {
 	// This debug statement will give the sizeof the lwDistanceResult struct when the node is run
 	// Ensure that the size outputed matches the size variable used for memory allocation and memcpy
 	RCLCPP_INFO(node->get_logger(), "Starting SF45B node. Size of lwDistanceResult: %zu bytes", sizeof(lwDistanceResult));
-
 	
+    std::cout << "Size of uint16_t: " << sizeof(uint16_t) << " bytes" << std::endl;
+
 	if (driverStart(&serial, portName.c_str(), baudRate) != 0) {
 		RCLCPP_ERROR(node->get_logger(), "Failed to start driver");
 		return 1;
@@ -333,7 +337,7 @@ int main(int argc, char** argv) {
 
 				// LIO-SAM requires a relative scan time that ranges between 0 and 0.2 seconds for a 5Hz scan
 				// With 5000 pps and (maxPointPerMsg = 5000) we have 0.2 / 5000 => 0.00004 increments
-				relativeScanTime += 0.0002;
+				relativeScanTime += 0.0002f;
 
 				++currentPoint;
 			}
@@ -354,7 +358,7 @@ int main(int argc, char** argv) {
 				}
 
 				currentPoint = 0;
-				relativeScanTime = 0.0;
+				relativeScanTime = 0.0f;
 			}
 		}
 
