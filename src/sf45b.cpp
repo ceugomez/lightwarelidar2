@@ -289,7 +289,7 @@ int main(int argc, char** argv) {
 	pointCloudMsg.fields[3].count = 1;
 
 	pointCloudMsg.fields[4].name = "ring";
-	pointCloudMsg.fields[4].offset = 14;
+	pointCloudMsg.fields[4].offset = 16;
 	pointCloudMsg.fields[4].datatype = 4; // 4: uint16
 	pointCloudMsg.fields[4].count = 1;
 
