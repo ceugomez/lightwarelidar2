@@ -117,7 +117,7 @@ int driverScanStart(lwSerialPort* Serial, lwSf45Params* Params) {
 	return 0;
 }
 
-struct lwDistanceResult {
+struct __attribute__((packed)) lwDistanceResult {
 	float x;
 	float y;
 	float z;
@@ -261,7 +261,7 @@ int main(int argc, char** argv) {
 
 	// This value can be compiler/hardware specific. It's vital to check that this matches
 	// the number of bytes for an lwDistanceResult struct as padding (or lack of) can alter the memory size.
-	int32_t sizeOflwDistanceResultStruct = 24;
+	int32_t sizeOflwDistanceResultStruct = 22;
 
 	sensor_msgs::msg::PointCloud2 pointCloudMsg;
 	pointCloudMsg.header.frame_id = frameId;
@@ -327,8 +327,8 @@ int main(int argc, char** argv) {
 			int status = driverScan(serial, &distanceResult, &rawDistanceResult);
 
 			distanceResult.time = relativeScanTime;
-			std::cout << "relative scan time " << relativeScanTime << std::endl;
-			std::cout << "distanceResult.time set to: " << distanceResult.time << std::endl;
+			//std::cout << "relative scan time " << relativeScanTime << std::endl;
+			//std::cout << "distanceResult.time set to: " << distanceResult.time << std::endl;
 
 			if (status == 0) {
 				break;
