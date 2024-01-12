@@ -65,13 +65,13 @@ class PointcloudSubscriber : public rclcpp::Node
       int numberOfPoints = msg->width * msg->height;
 
       // Move iterators to the last point
-      iter_x += (numberOfPoints - 1);
-      iter_y += (numberOfPoints - 1);
-      iter_z += (numberOfPoints - 1);
-      iter_int += (numberOfPoints - 1);
-      iter_time += (numberOfPoints - 1);
-      iter_ring += (numberOfPoints - 1);
-      iter_dd += (numberOfPoints - 1);
+      iter_x += (numberOfPoints - 2);
+      iter_y += (numberOfPoints - 2);
+      iter_z += (numberOfPoints - 2);
+      iter_int += (numberOfPoints - 2);
+      iter_time += (numberOfPoints - 2);
+      iter_ring += (numberOfPoints - 2);
+      iter_dd += (numberOfPoints - 2);
 
       // Print the last point
       RCLCPP_INFO(this->get_logger(), "Last point: x=%f, y=%f, z=%f, intensity=%f, time=%f, ring=%hu, dummy_data=%hu",
