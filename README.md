@@ -1,31 +1,12 @@
 # LightWare Optoelectronics ROS2 driver package
-
-## sf40c Node
-
-This node interfaces with an SF40/C and passes laser scan data to the laserscan topic.
-
-Note: The SF40/C should be configured to run at a baud rate of 921600. This is the default factory setting.
-
-### Published topics
-/laserscan (sensor_msgs/LaserScan)
-
-A full 360 degrees of scan data is published to this topic at around 5Hz.
-
-### Parameters
-~port (string, default: /dev/ttyUSB0)
-
-The communications port used to interface with the SF40/C.
-
-~frame_id (string, default: laser)
-
-The transformation frame.
+We have modified this version from the original lightwarelidar2 repo to make it compatible with LIO-SAM.
 
 ## sf45b Node
 
 This node interfaces with an SF45/B and passes point cloud data to the pointcloud topic.
 
 ### Published topics
-/pointcloud (sensor_msgs/PointCloud2)
+/points (sensor_msgs/PointCloud2)
 
 A configurable number of points are published to this topic. See the maxPoints parameter to control how often this topic is updated.
 
