@@ -236,19 +236,30 @@ int main(int argc, char** argv) {
 	bool publishLaserScan = node->declare_parameter<bool>("publishLaserScan", false);
 
 	lwSf45Params params;
-	params.updateRate = node->declare_parameter<int32_t>("updateRate", 7); // 1 to 12
+	params.updateRate = node->declare_parameter<int32_t>("updateRate", 11); // 11: 2500pps
 	params.cycleDelay = node->declare_parameter<int32_t>("cycleDelay", 10); // 5 to 2000
 	params.lowAngleLimit = node->declare_parameter<int32_t>("lowAngleLimit", -160.0f); // -160 to -10
 	params.highAngleLimit = node->declare_parameter<int32_t>("highAngleLimit", 160.0f); // 10 to 160
 	validateParams(&params);
 	
-	int32_t maxPointsPerMsg = node->declare_parameter<int32_t>("maxPoints", 1500); // 1 to ...
+	int32_t maxPointsPerMsg = node->declare_parameter<int32_t>("maxPoints", 3750); // 1 to ...
 	if (maxPointsPerMsg < 1) maxPointsPerMsg = 1;
 
-	// This debug statement will give the sizeof the lwDistanceResult struct when the node is run
-	// Ensure that the size outputed matches the size variable used for memory allocation and memcpy
-	RCLCPP_INFO(node->get_logger(), "Starting SF45B node. Size of lwDistanceResult: %zu bytes", sizeof(lwDistanceResult));
-	
+	float relativeTimeIncrement = (1.5f / maxPointsPerMsg);
+
+	RCLCPP_INFO(node->get_logger(),
+            "\nSF45 Parameters: \n"
+            "\tlwDistanceResult: %zu bytes.\n"
+            "\tRelativeTimeIncrement: %fs.\n"
+            "\tUpdateRate: %d.\n"
+            "\tCycleDelay: %d.\n"
+            "\tMaxPointsPerMsg: %d",
+            sizeof(lwDistanceResult),
+            relativeTimeIncrement,
+            params.updateRate,
+            params.cycleDelay,
+            maxPointsPerMsg);
+
 	if (driverStart(&serial, portName.c_str(), baudRate) != 0) {
 		RCLCPP_ERROR(node->get_logger(), "Failed to start driver");
 		return 1;
@@ -262,8 +273,6 @@ int main(int argc, char** argv) {
 	// This value can be compiler/hardware specific. It's vital to check that this matches
 	// the number of bytes for an lwDistanceResult struct as padding (or lack of) can alter the memory size.
 	int32_t sizeOflwDistanceResultStruct = 24;
-
-	float relativeTimeIncrement = (0.2f / maxPointsPerMsg);
 
 	sensor_msgs::msg::PointCloud2 pointCloudMsg;
 	pointCloudMsg.header.frame_id = frameId;
