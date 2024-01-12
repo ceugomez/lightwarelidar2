@@ -61,24 +61,24 @@ class PointcloudSubscriber : public rclcpp::Node
       RCLCPP_INFO(this->get_logger(), "2nd point: x=%f, y=%f, z=%f, intensity=%f, time=%f, ring=%hu, dummy_data=%hu",
             *iter_x, *iter_y, *iter_z, *iter_int, *iter_time, *iter_ring, *iter_dd);
 
-      // The compiler barfed when I tried to use the decrement operator so hacking this together
-      // Iterate to the last point
-      int indexOfLastPoint = 1499;  // (999 for 1000 points)
-      
-      // Move iterators to the last point accounting for the prior increments
-      iter_x += (indexOfLastPoint - 3);
-      iter_y += (indexOfLastPoint - 3);
-      iter_z += (indexOfLastPoint - 3);
-      iter_int += (indexOfLastPoint - 3);
-      iter_time += (indexOfLastPoint - 3);
-      iter_ring += (indexOfLastPoint - 3);
-      iter_dd += (indexOfLastPoint - 3);
+      // Calculate the number of points in the cloud
+      int numberOfPoints = msg->width * msg->height;
 
+      // Move iterators to the last point
+      iter_x += (numberOfPoints - 1);
+      iter_y += (numberOfPoints - 1);
+      iter_z += (numberOfPoints - 1);
+      iter_int += (numberOfPoints - 1);
+      iter_time += (numberOfPoints - 1);
+      iter_ring += (numberOfPoints - 1);
+      iter_dd += (numberOfPoints - 1);
+
+      // Print the last point
       RCLCPP_INFO(this->get_logger(), "Last point: x=%f, y=%f, z=%f, intensity=%f, time=%f, ring=%hu, dummy_data=%hu",
             *iter_x, *iter_y, *iter_z, *iter_int, *iter_time, *iter_ring, *iter_dd);
-  }
+      }
 
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subscription_;
+      rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subscription_;
 };
 
 int main(int argc, char * argv[])

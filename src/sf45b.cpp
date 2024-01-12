@@ -264,6 +264,8 @@ int main(int argc, char** argv) {
 	// the number of bytes for an lwDistanceResult struct as padding (or lack of) can alter the memory size.
 	int32_t sizeOflwDistanceResultStruct = 24;
 
+	float relativeTimeIncrement = (0.2f / maxPointsPerMsg);
+
 	sensor_msgs::msg::PointCloud2 pointCloudMsg;
 	pointCloudMsg.header.frame_id = frameId;
 	pointCloudMsg.height = 1;
@@ -332,19 +334,20 @@ int main(int argc, char** argv) {
 			int status = driverScan(serial, &distanceResult, &rawDistanceResult);
 
 			distanceResult.time = relativeScanTime;
+
+			// Explicit casts may not be necessary - doing as a debug step
 			distanceResult.ring = (uint16_t) 0;
 			distanceResult.dummy_data = (uint16_t) 1;
 
 			if (status == 0) {
 				break;
 			} else {
-
 				distanceResults[currentPoint] = distanceResult;
 				rawDistances[currentPoint] = rawDistanceResult;
 
 				// LIO-SAM requires a relative scan time that ranges between 0 and 0.2 seconds for a 5Hz scan
-				// With 5000 pps and (maxPointPerMsg = 5000) we have 0.2 / 5000 => 0.00004 increments
-				relativeScanTime += 0.0002f;
+				// TODO - double check that this is correct!
+				relativeScanTime += relativeTimeIncrement;
 
 				++currentPoint;
 			}
