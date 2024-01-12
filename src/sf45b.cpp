@@ -125,7 +125,6 @@ struct lwDistanceResult {
 	float intensity;
 	float time;
 	uint16_t ring;
-	uint16_t dummy_data;
 };
 
 struct rawDistanceResult
@@ -264,12 +263,14 @@ int main(int argc, char** argv) {
 	// the number of bytes for an lwDistanceResult struct as padding (or lack of) can alter the memory size.
 	int32_t sizeOflwDistanceResultStruct = 24;
 
+	float relativeTimeIncrement = (0.2f / maxPointsPerMsg);
+
 	sensor_msgs::msg::PointCloud2 pointCloudMsg;
 	pointCloudMsg.header.frame_id = frameId;
 	pointCloudMsg.height = 1;
 	pointCloudMsg.width = maxPointsPerMsg;
 	
-	pointCloudMsg.fields.resize(7);
+	pointCloudMsg.fields.resize(6);
 	pointCloudMsg.fields[0].name = "x";
 	pointCloudMsg.fields[0].offset = 0;	
 	pointCloudMsg.fields[0].datatype = 7;
@@ -302,11 +303,6 @@ int main(int argc, char** argv) {
 	pointCloudMsg.fields[5].datatype = 4; // 4: uint16
 	pointCloudMsg.fields[5].count = 1;
 
-	pointCloudMsg.fields[6].name = "dummy_data";
-	pointCloudMsg.fields[6].offset = 22;
-	pointCloudMsg.fields[6].datatype = 4; // 4: uint16
-	pointCloudMsg.fields[6].count = 1;
-
 	pointCloudMsg.is_bigendian = false;
 	pointCloudMsg.point_step = sizeOflwDistanceResultStruct;
 	pointCloudMsg.row_step = sizeOflwDistanceResultStruct * maxPointsPerMsg;
@@ -333,7 +329,6 @@ int main(int argc, char** argv) {
 
 			distanceResult.time = relativeScanTime;
 			distanceResult.ring = (uint16_t) 0;
-			distanceResult.dummy_data = (uint16_t) 1;
 
 			if (status == 0) {
 				break;
@@ -343,8 +338,8 @@ int main(int argc, char** argv) {
 				rawDistances[currentPoint] = rawDistanceResult;
 
 				// LIO-SAM requires a relative scan time that ranges between 0 and 0.2 seconds for a 5Hz scan
-				// With 5000 pps and (maxPointPerMsg = 5000) we have 0.2 / 5000 => 0.00004 increments
-				relativeScanTime += 0.0002f;
+				// TODO - double check that this is correct!
+				relativeScanTime += relativeTimeIncrement;
 
 				++currentPoint;
 			}
