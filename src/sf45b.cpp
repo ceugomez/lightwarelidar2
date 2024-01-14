@@ -236,13 +236,13 @@ int main(int argc, char** argv) {
 	bool publishLaserScan = node->declare_parameter<bool>("publishLaserScan", false);
 
 	lwSf45Params params;
-	params.updateRate = node->declare_parameter<int32_t>("updateRate", 11); // 11: 2500pps
+	params.updateRate = node->declare_parameter<int32_t>("updateRate", 12); // 11: 2500pps
 	params.cycleDelay = node->declare_parameter<int32_t>("cycleDelay", 10); // 5 to 2000
 	params.lowAngleLimit = node->declare_parameter<int32_t>("lowAngleLimit", -160.0f); // -160 to -10
 	params.highAngleLimit = node->declare_parameter<int32_t>("highAngleLimit", 160.0f); // 10 to 160
 	validateParams(&params);
 	
-	int32_t maxPointsPerMsg = node->declare_parameter<int32_t>("maxPoints", 3750); // 1 to ...
+	int32_t maxPointsPerMsg = node->declare_parameter<int32_t>("maxPoints", 1000); // 1 to ...
 	if (maxPointsPerMsg < 1) maxPointsPerMsg = 1;
 
 	float relativeTimeIncrement = (1.5f / maxPointsPerMsg);
